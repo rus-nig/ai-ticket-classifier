@@ -35,3 +35,45 @@ def extract_key_information(specification: str) -> Dict[str, List[str]]:
             sections[current_section].append(line)
     return sections
 
+
+def process_all_specifications(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    processed_data = []
+    for spec in data:
+        specification_text = spec.get("specification", "")
+        key_info = extract_key_information(specification_text)
+        processed_data.append({
+            "original_specification": specification_text,
+            "key_information": key_info,
+            "test_cases": spec.get("test_cases", []),
+            "gherkin": spec.get("gherkin", [])
+        })
+    return processed_data
+
+
+if __name__ == "__main__":
+    # Example usage
+    example_file = "data/example_data.json"
+
+    try:
+        all_specifications = parse_json_specifications(example_file)
+
+        processed = process_all_specifications(all_specifications)
+
+        for idx, item in enumerate(processed, start=1):
+            print(f"Specification {idx}:")
+            print("Original Specification:")
+            print(item["original_specification"])
+            print("\nExtracted Key Information:")
+            print(item["key_information"])
+            print("\nTest Cases:")
+            for tc in item["test_cases"]:
+                print(f"- Description: {tc['description']}")
+                print(f"  Steps: {', '.join(tc['steps'])}")
+                print(f"  Expected Result: {tc['expected_result']}")
+            print("\nGherkin Scenarios:")
+            for scenario in item["gherkin"]:
+                print(f"- {scenario}")
+            print("\n" + "="*40 + "\n")
+
+    except Exception as e:
+        print(f"Error: {e}")
