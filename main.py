@@ -1,2 +1,2 @@
 if __name__ == "__main__":
-    print("Welcome to spec2test-gen!")
+    print("Welcome to ai-ticket-classifier!")
