@@ -2,5 +2,6 @@ flask
 pandas
 numpy
 scikit-learn
+sklearn
 torch
 transformers
