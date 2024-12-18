@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 
 import pickle
 import os
+import pandas as pd
+import shutil
 
 app = Flask(__name__)
 
@@ -54,5 +56,43 @@ def categorize():
 
     return jsonify({"description": description, "predicted_type": prediction[0]}), 200
 
+@app.route('/data', methods=['POST', 'GET'])
+def manage_data():
+    """Управление данными (загрузка/сохранение)."""
+    if request.method == 'POST':
+        file = request.files.get('file')
+        
+        if not file:
+            return jsonify({"error": "Файл не предоставлен"}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({"error": "Файл должен быть в формате CSV"}), 400
+
+        temp_path = os.path.join('data', 'temp.csv')
+        file.save(temp_path)
+
+        try:
+            data = pd.read_csv(temp_path, delimiter=';', usecols=['Description', 'Type'])
+            required_columns = ['Description', 'Type']
+            for col in required_columns:
+                if col not in data.columns:
+                    os.remove(temp_path)
+                    return jsonify({"error": f"Отсутствует колонка '{col}' в CSV"}), 400
+
+            shutil.copy(temp_path, DATA_PATH)
+            os.remove(temp_path)
+            return jsonify({"message": "Файл успешно загружен"}), 200
+
+        except Exception as e:
+            os.remove(temp_path)
+            return jsonify({"error": f"Ошибка при обработке файла: {str(e)}"}), 400
+
+    if request.method == 'GET':
+        if not os.path.exists(DATA_PATH):
+            return jsonify({"error": "Файл данных отсутствует"}), 404
+
+        data = pd.read_csv(DATA_PATH, delimiter=';', on_bad_lines='skip').to_dict(orient='records')
+        return jsonify({"data": data}), 200
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=True)
