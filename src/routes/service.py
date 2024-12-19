@@ -94,5 +94,25 @@ def manage_data():
         data = pd.read_csv(DATA_PATH, delimiter=';', on_bad_lines='skip').to_dict(orient='records')
         return jsonify({"data": data}), 200
     
+@app.route('/load-model', methods=['POST'])
+def load_model():
+    """Загрузка пользовательской модели и векторизатора."""
+    model_file = request.files.get('model')
+    vectorizer_file = request.files.get('vectorizer')
+
+    if not model_file or not vectorizer_file:
+        return jsonify({"error": "Оба файла (модель и векторизатор) должны быть предоставлены"}), 400
+
+    try:
+        model_file.save(MODEL_PATH)
+        vectorizer_file.save(VECTORIZER_PATH)
+
+        load_model_and_vectorizer()
+
+        return jsonify({"message": "Модель и векторизатор успешно загружены"}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Ошибка при загрузке модели: {str(e)}"}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=True)
