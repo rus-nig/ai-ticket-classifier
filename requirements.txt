@@ -5,6 +5,5 @@ numpy
 pandas
 scikit-learn
 seaborn
-sklearn
 torch
 transformers
