@@ -8,6 +8,3 @@ venv/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
-
-# Models and data
-data/
