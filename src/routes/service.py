@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from src.db.database import get_db_connection
 
 import pickle
 import os
@@ -41,20 +42,41 @@ def status():
 
 @app.route('/categorize', methods=['POST'])
 def categorize():
-    """Категоризация тикета."""
+    """Категоризация тикета и сохранение результата в БД."""
     if model is None or vectorizer is None:
         return jsonify({"error": "Модель не загружена"}), 500
 
     data = request.get_json()
     description = data.get('description', '')
+    ticket_id = data.get('id')
 
     if not description:
         return jsonify({"error": "Отсутствует описание тикета"}), 400
 
+    # Предсказание категории
     vectorized_description = vectorizer.transform([description])
-    prediction = model.predict(vectorized_description)
+    prediction = model.predict(vectorized_description)[0]
 
-    return jsonify({"description": description, "predicted_type": prediction[0]}), 200
+    # Сохранение в БД
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            query = """
+                INSERT INTO ticket_predictions (ticket_id, description, predicted_type)
+                VALUES (%s, %s, %s)
+            """
+            cursor.execute(query, (ticket_id, description, prediction))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Ошибка сохранения в БД:", e)
+        return jsonify({"error": "Ошибка сохранения данных в БД"}), 500
+
+    return jsonify({
+        "description": description,
+        "predicted_type": prediction,
+        "ticket_id": ticket_id
+    }), 200
 
 @app.route('/data', methods=['POST', 'GET'])
 def manage_data():
