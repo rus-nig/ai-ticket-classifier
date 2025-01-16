@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from src.db.database import get_db_connection
 
 import pickle
+import csv
 import os
 import pandas as pd
 import shutil
@@ -17,6 +18,52 @@ VECTORIZER_PATH = 'models/tfidf_vectorizer.pkl'
 model, vectorizer = None, None
 
 # ==================== Утилиты ====================
+
+def export_tickets_to_csv():
+    """
+    Функция для экспорта данных из базы данных в tickets.csv.
+    """
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT ticket_id, description, predicted_type FROM ticket_predictions")
+    tickets_from_db = cursor.fetchall()
+
+    # Если файл tickets.csv отсутствует, создаём его с корректными колонками
+    if not os.path.exists(DATA_PATH):
+        with open(DATA_PATH, mode='w', newline='') as csv_file:
+            writer = csv.writer(csv_file, delimiter=';')
+            writer.writerow(['id', 'title', 'Type', 'Description'])
+
+    with open(DATA_PATH, mode='r', newline='') as csv_file:
+        existing_data = list(csv.reader(csv_file, delimiter=';'))
+        existing_ids = {row[0] for row in existing_data[1:]}
+
+    # Преобразование данных из базы в формат CSV
+    new_tickets = []
+    for ticket in tickets_from_db:
+        ticket_id, description, predicted_type = ticket
+
+        new_row = [
+            ticket_id,         # id
+            "",                # title
+            predicted_type,    # Type
+            description        # Description
+        ]
+
+        if str(ticket_id) not in existing_ids:
+            new_tickets.append(new_row)
+
+    if new_tickets:
+        with open(DATA_PATH, mode='a', newline='') as csv_file:
+            writer = csv.writer(csv_file, delimiter=';')
+            writer.writerows(new_tickets)
+        print(f"{len(new_tickets)} новых записей добавлено в {DATA_PATH}.")
+    else:
+        print("Новых записей для добавления нет.")
+
+    cursor.close()
+    connection.close()
 
 def load_model_and_vectorizer():
     global model, vectorizer
@@ -135,6 +182,14 @@ def load_model():
 
     except Exception as e:
         return jsonify({"error": f"Ошибка при загрузке модели: {str(e)}"}), 500
+    
+@app.route('/export-tickets', methods=['POST'])
+def export_tickets():
+    """
+    Тестовый временный эндпоинт для экспорта данных из базы данных в tickets.csv.
+    """
+    export_tickets_to_csv()
+    return jsonify({"message": "Данные успешно экспортированы."}), 200
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=True)
