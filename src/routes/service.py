@@ -197,8 +197,17 @@ def load_model():
 @app.route('/train-model', methods=['POST'])
 def train_model():
     """
-    Эндпоинт для обучения модели на основе данных tickets.csv.
+    Эндпоинт для обучения модели на основе данных из tickets.csv с опциональной догрузкой данных из БД.
     """
+    # Проверяем, передал ли пользователь параметр для догрузки данных из БД
+    data = request.get_json()
+    load_from_db = data.get('load_from_db', False)
+
+    if load_from_db:
+        # Догружаем записи из базы данных в tickets.csv
+        export_tickets_to_csv()
+        db_message = "Данные из базы данных успешно добавлены в tickets.csv. "
+
     try:
         # Шаг 1: Загрузка данных
         if not os.path.exists(DATA_PATH):
@@ -268,14 +277,14 @@ def train_model():
         # Шаг 7: Сохранение лучшей модели и векторизатора
         with open(MODEL_PATH, 'wb') as model_file:
             pickle.dump(best_model, model_file)
-
+            
         with open(VECTORIZER_PATH, 'wb') as vectorizer_file:
             pickle.dump(vectorizer, vectorizer_file)
 
         load_model_and_vectorizer()
 
         return jsonify({
-            "message": f"Обучение завершено. Лучшая модель: {best_model_name} с точностью {best_accuracy:.4f}",
+            "message": f"{db_message}Обучение завершено. Лучшая модель: {best_model_name} с точностью {best_accuracy:.4f}",
             "model_path": MODEL_PATH,
             "vectorizer_path": VECTORIZER_PATH
         }), 200
