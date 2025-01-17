@@ -28,7 +28,56 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Запустите приложение
+### 4. Настройте базу данных PostgreSQL
+1. Убедитесь, что PostgreSQL установлен на вашем компьютере.
+
+Для **Windows**:  
+Скачайте установочный файл с официального сайта [PostgreSQL](https://www.postgresql.org/download/) и следуйте инструкциям.
+
+Для **macOS**:
+```bash
+brew install postgresql
+```
+
+Для **Linux**:
+```bash
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+```
+
+2. Запустите сервер PostgreSQL
+
+Для **macOS**:
+```bash
+brew services start postgresql
+```
+
+Для **Linux**:
+```bash
+sudo service postgresql start
+```
+
+3. Создайте базу данных и таблицу для проекта:
+Войдите в консоль PostgreSQL:
+```bash
+psql
+```
+Выполните команды:
+
+```sql
+CREATE DATABASE ticket_classifier;
+\c ticket_classifier
+CREATE TABLE ticket_predictions (
+    id SERIAL PRIMARY KEY,
+    ticket_id VARCHAR(50),
+    description TEXT NOT NULL,
+    predicted_type VARCHAR(50) NOT NULL,
+    title TEXT,
+);
+```
+4. Настройте подключение в файле `src/db/database.py`, изменив параметры `dbname`, `user`, `password` и `host` при необходимости.
+
+### 5. Запустите приложение
 ```bash
 python src/routes/service.py
 ```
@@ -96,7 +145,7 @@ python src/routes/service.py
 ## Настройка данных
 
 ### Подготовка данных
-1. Убедитесь, что ваш CSV-файл содержит два обязательных столбца:
+1. Убедитесь, что ваш CSV-файл содержит, как минимум, два обязательных столбца:
    - `Description` — текстовое описание тикета.
    - `Type` — категория тикета.
 

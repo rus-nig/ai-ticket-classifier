@@ -26,36 +26,36 @@ def export_tickets_to_csv():
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT ticket_id, description, predicted_type FROM ticket_predictions")
+    cursor.execute("SELECT ticket_id, title, description, predicted_type FROM ticket_predictions")
     tickets_from_db = cursor.fetchall()
 
     # Если файл tickets.csv отсутствует, создаём его с корректными колонками
     if not os.path.exists(DATA_PATH):
-        with open(DATA_PATH, mode='w', newline='') as csv_file:
+        with open(DATA_PATH, mode='w', encoding='utf-8', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
             writer.writerow(['id', 'title', 'Type', 'Description'])
 
-    with open(DATA_PATH, mode='r', newline='') as csv_file:
+    with open(DATA_PATH, mode='r', encoding='utf-8') as csv_file:
         existing_data = list(csv.reader(csv_file, delimiter=';'))
         existing_ids = {row[0] for row in existing_data[1:]}
 
     # Преобразование данных из базы в формат CSV
     new_tickets = []
     for ticket in tickets_from_db:
-        ticket_id, description, predicted_type = ticket
+        ticket_id, title, description, predicted_type = ticket
 
         new_row = [
-            ticket_id,         # id
-            "",                # title
-            predicted_type,    # Type
-            description        # Description
+            ticket_id or "",    # id
+            title or "",        # title
+            predicted_type,     # Type
+            description         # Description
         ]
 
         if str(ticket_id) not in existing_ids:
             new_tickets.append(new_row)
 
     if new_tickets:
-        with open(DATA_PATH, mode='a', newline='') as csv_file:
+        with open(DATA_PATH, mode='a', encoding='utf-8', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
             writer.writerows(new_tickets)
         print(f"{len(new_tickets)} новых записей добавлено в {DATA_PATH}.")
@@ -96,6 +96,7 @@ def categorize():
     data = request.get_json()
     description = data.get('description', '')
     ticket_id = data.get('id')
+    title = data.get('title', '')
 
     if not description:
         return jsonify({"error": "Отсутствует описание тикета"}), 400
@@ -109,10 +110,10 @@ def categorize():
         conn = get_db_connection()
         with conn.cursor() as cursor:
             query = """
-                INSERT INTO ticket_predictions (ticket_id, description, predicted_type)
-                VALUES (%s, %s, %s)
+                INSERT INTO ticket_predictions (ticket_id, title, description, predicted_type)
+                VALUES (%s, %s, %s, %s)
             """
-            cursor.execute(query, (ticket_id, description, prediction))
+            cursor.execute(query, (ticket_id, title, description, prediction))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -122,7 +123,8 @@ def categorize():
     return jsonify({
         "description": description,
         "predicted_type": prediction,
-        "ticket_id": ticket_id
+        "ticket_id": ticket_id,
+        "title": title
     }), 200
 
 @app.route('/data', methods=['POST', 'GET'])
