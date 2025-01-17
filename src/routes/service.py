@@ -1,6 +1,15 @@
 from flask import Flask, request, jsonify
 from src.db.database import get_db_connection
 
+from imblearn.over_sampling import SMOTE
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+
 import pickle
 import csv
 import os
@@ -185,13 +194,94 @@ def load_model():
     except Exception as e:
         return jsonify({"error": f"Ошибка при загрузке модели: {str(e)}"}), 500
     
-@app.route('/export-tickets', methods=['POST'])
-def export_tickets():
+@app.route('/train-model', methods=['POST'])
+def train_model():
     """
-    Тестовый временный эндпоинт для экспорта данных из базы данных в tickets.csv.
+    Эндпоинт для обучения модели на основе данных tickets.csv.
     """
-    export_tickets_to_csv()
-    return jsonify({"message": "Данные успешно экспортированы."}), 200
+    try:
+        # Шаг 1: Загрузка данных
+        if not os.path.exists(DATA_PATH):
+            return jsonify({"error": "Файл tickets.csv не найден"}), 404
+        data = pd.read_csv(DATA_PATH, delimiter=';')
+
+        # Проверка наличия обязательных колонок
+        required_columns = ['Description', 'Type']
+        if not all(col in data.columns for col in required_columns):
+            return jsonify({"error": f"Отсутствуют обязательные колонки: {required_columns}"}), 400
+
+        # Шаг 2: Предобработка данных
+        data = data.dropna(subset=['Description', 'Type'])
+        data['Description'] = data['Description'].str.lower()
+        data['Description'] = data['Description'].str.replace(r'[^a-zA-Z\s]', '', regex=True)
+
+        X = data['Description']
+        y = data['Type']
+
+        # Шаг 3: Разделение на обучающую и тестовую выборку
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+
+        # Шаг 4: Векторизация текста
+        vectorizer = TfidfVectorizer(max_features=5000, stop_words='english', ngram_range=(1, 2))
+        X_train_tfidf = vectorizer.fit_transform(X_train)
+        X_test_tfidf = vectorizer.transform(X_test)
+
+        # Шаг 5: Обработка дисбаланса классов
+        smote = SMOTE(random_state=42)
+        X_resampled, y_resampled = smote.fit_resample(X_train_tfidf, y_train)
+
+        # Шаг 6: Обучение моделей
+        models = {
+            "Logistic Regression": LogisticRegression(random_state=42, max_iter=1000),
+            "KNN": KNeighborsClassifier(),
+            "Random Forest": RandomForestClassifier(random_state=42),
+            "SVM": SVC(random_state=42, probability=True),
+            "Gradient Boosting": GradientBoostingClassifier(random_state=42)
+        }
+
+        param_grids = {
+            "Logistic Regression": {'C': [0.1, 1, 10], 'solver': ['lbfgs', 'liblinear']},
+            "KNN": {'n_neighbors': [3, 5, 7], 'weights': ['uniform', 'distance']},
+            "Random Forest": {'n_estimators': [100, 200], 'max_depth': [None, 10], 'min_samples_split': [2, 5]},
+            "SVM": {'C': [0.1, 1, 10], 'kernel': ['linear', 'rbf']},
+            "Gradient Boosting": {'n_estimators': [50, 100], 'learning_rate': [0.1, 0.2], 'max_depth': [3, 5]}
+        }
+
+        best_model_name = None
+        best_model = None
+        best_accuracy = 0
+
+        for model_name, model in models.items():
+            grid_search = GridSearchCV(model, param_grids[model_name], cv=3, scoring='accuracy')
+            grid_search.fit(X_resampled, y_resampled)
+            best_model_candidate = grid_search.best_estimator_
+
+            # Оценка модели
+            accuracy = accuracy_score(y_test, best_model_candidate.predict(X_test_tfidf))
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_model_name = model_name
+                best_model = best_model_candidate
+
+        # Шаг 7: Сохранение лучшей модели и векторизатора
+        with open(MODEL_PATH, 'wb') as model_file:
+            pickle.dump(best_model, model_file)
+
+        with open(VECTORIZER_PATH, 'wb') as vectorizer_file:
+            pickle.dump(vectorizer, vectorizer_file)
+
+        load_model_and_vectorizer()
+
+        return jsonify({
+            "message": f"Обучение завершено. Лучшая модель: {best_model_name} с точностью {best_accuracy:.4f}",
+            "model_path": MODEL_PATH,
+            "vectorizer_path": VECTORIZER_PATH
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Ошибка обучения модели: {str(e)}"}), 500
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=True)
