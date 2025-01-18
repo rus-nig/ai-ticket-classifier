@@ -197,7 +197,7 @@ def load_model():
 @app.route('/train-model', methods=['POST'])
 def train_model():
     """
-    Эндпоинт для обучения модели на основе данных из tickets.csv с опциональной догрузкой данных из БД.
+    Обучение модели на основе данных из tickets.csv с опциональной догрузкой данных из БД.
     """
     # Проверяем, передал ли пользователь параметр для догрузки данных из БД
     data = request.get_json()
@@ -291,6 +291,101 @@ def train_model():
 
     except Exception as e:
         return jsonify({"error": f"Ошибка обучения модели: {str(e)}"}), 500
+    
+@app.route('/tickets', methods=['GET'])
+def get_tickets():
+    """
+    Получение всех записей из базы данных.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, description, predicted_type FROM ticket_predictions")
+        tickets = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        tickets_list = [
+            {"id": ticket[0], "title": ticket[1], "description": ticket[2], "predicted_type": ticket[3]}
+            for ticket in tickets
+        ]
+
+        return jsonify({"tickets": tickets_list}), 200
+    except Exception as e:
+        print("Ошибка при получении данных из БД:", e)
+        return jsonify({"error": "Ошибка при получении данных из базы"}), 500
+
+
+@app.route('/tickets/<id>', methods=['DELETE'])
+def delete_ticket(id):
+    """
+    Удаление записи из базы данных по id.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ticket_predictions WHERE id = %s", (id,))
+        conn.commit()
+
+        rows_deleted = cursor.rowcount
+        cursor.close()
+        conn.close()
+
+        if rows_deleted == 0:
+            return jsonify({"message": f"Тикет с ID {id} не найден"}), 404
+
+        return jsonify({"message": f"Тикет с ID {id} успешно удален"}), 200
+    except Exception as e:
+        print("Ошибка при удалении записи из БД:", e)
+        return jsonify({"error": "Ошибка при удалении записи из базы"}), 500
+
+
+@app.route('/tickets/<id>', methods=['PUT'])
+def update_ticket(id):
+    """
+    Обновление записи в базе данных.
+    """
+    try:
+        data = request.get_json()
+        title = data.get('title')
+        description = data.get('description')
+        predicted_type = data.get('predicted_type')
+
+        if not title and not description and not predicted_type:
+            return jsonify({"error": "Нет данных для обновления"}), 400
+
+        fields_to_update = []
+        params = []
+        if title:
+            fields_to_update.append("title = %s")
+            params.append(title)
+        if description:
+            fields_to_update.append("description = %s")
+            params.append(description)
+        if predicted_type:
+            fields_to_update.append("predicted_type = %s")
+            params.append(predicted_type)
+
+        params.append(id)
+        sql_query = f"UPDATE ticket_predictions SET {', '.join(fields_to_update)} WHERE id = %s"
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(sql_query, tuple(params))
+        conn.commit()
+
+        rows_updated = cursor.rowcount
+        cursor.close()
+        conn.close()
+
+        if rows_updated == 0:
+            return jsonify({"message": f"Тикет с ID {id} не найден"}), 404
+
+        return jsonify({"message": f"Тикет с ID {id} успешно обновлен"}), 200
+    except Exception as e:
+        print("Ошибка при обновлении записи в БД:", e)
+        return jsonify({"error": "Ошибка при обновлении записи в базе"}), 500
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, debug=True)

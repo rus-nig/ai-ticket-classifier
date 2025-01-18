@@ -5,7 +5,6 @@ from io import StringIO
 
 API_URL = "http://127.0.0.1:5050"
 
-
 st.sidebar.title("Навигация")
 menu = st.sidebar.radio(
     "Выберите действие",
