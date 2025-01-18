@@ -1,96 +1,106 @@
 import streamlit as st
 import requests
 import pandas as pd
+from io import StringIO
 
 API_URL = "http://127.0.0.1:5050"
 
-st.set_page_config(page_title="AI Ticket Classifier", layout="wide")
 
-st.title("AI Ticket Classifier")
+st.sidebar.title("Навигация")
+menu = st.sidebar.radio(
+    "Выберите действие",
+    ["Статус сервера", "Классификация тикетов", "Обучение модели", "Управление данными", "Визуализация"]
+)
 
-# ====================== Категоризация тикета ======================
-st.header("Категоризация тикета")
-with st.form("categorize_form"):
-    ticket_id = st.text_input("ID тикета (необязательно):")
-    title = st.text_input("Название тикета (необязательно):")
-    description = st.text_area("Описание тикета:", height=150)
-    submitted = st.form_submit_button("Классифицировать")
-
-    if submitted:
-        if not description:
-            st.error("Описание тикета обязательно!")
+# Вкладка: Статус сервера
+if menu == "Статус сервера":
+    st.title("Проверка статуса сервера")
+    try:
+        response = requests.get(f"{API_URL}/status")
+        if response.status_code == 200:
+            st.success(f"Сервер работает! Ответ: {response.json()}")
         else:
-            payload = {
-                "id": ticket_id,
-                "title": title,
-                "description": description
-            }
+            st.error(f"Ошибка соединения с сервером. Код ответа: {response.status_code}")
+    except Exception as e:
+        st.error(f"Ошибка: {e}")
+
+# Вкладка: Классификация тикетов
+elif menu == "Классификация тикетов":
+    st.title("Классификация тикетов")
+    description = st.text_area("Введите описание тикета:")
+    ticket_id = st.text_input("Введите ID тикета (опционально):")
+    title = st.text_input("Введите заголовок тикета (опционально):")
+
+    if st.button("Классифицировать"):
+        payload = {"description": description, "id": ticket_id, "title": title}
+        try:
             response = requests.post(f"{API_URL}/categorize", json=payload)
             if response.status_code == 200:
-                st.success(f"Предсказанная категория: {response.json()['predicted_type']}")
+                result = response.json()
+                st.success(f"Предсказанная категория: {result['predicted_type']}")
+                st.write(result)
             else:
-                st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
+                st.error(f"Ошибка: {response.json()['error']}")
+        except Exception as e:
+            st.error(f"Ошибка: {e}")
 
-# ====================== Обучение модели ======================
-st.header("Обучение модели")
-with st.form("train_model_form"):
-    load_from_db = st.checkbox("Догрузить данные из базы данных")
-    train_submitted = st.form_submit_button("Запустить обучение")
+# Вкладка: Обучение модели
+elif menu == "Обучение модели":
+    st.title("Обучение модели")
+    load_from_db = st.checkbox("Подгружать данные из базы перед обучением")
 
-    if train_submitted:
+    if st.button("Обучить модель"):
         payload = {"load_from_db": load_from_db}
-        response = requests.post(f"{API_URL}/train-model", json=payload)
-        if response.status_code == 200:
-            st.success(response.json()["message"])
-        else:
-            st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
+        try:
+            response = requests.post(f"{API_URL}/train-model", json=payload)
+            if response.status_code == 200:
+                result = response.json()
+                st.success(result["message"])
+                st.write(result)
+            else:
+                st.error(f"Ошибка: {response.json()['error']}")
+        except Exception as e:
+            st.error(f"Ошибка: {e}")
 
-# ====================== Управление данными ======================
-st.header("Управление данными")
-uploaded_file = st.file_uploader("Загрузить CSV-файл с данными", type=["csv"])
-if st.button("Загрузить данные"):
+# Вкладка: Управление данными
+elif menu == "Управление данными":
+    st.title("Управление данными")
+    uploaded_file = st.file_uploader("Загрузите CSV файл для обновления данных", type=["csv"])
+
     if uploaded_file is not None:
-        files = {"file": uploaded_file.getvalue()}
-        response = requests.post(f"{API_URL}/data", files=files)
+        try:
+            response = requests.post(
+                f"{API_URL}/data",
+                files={"file": ("tickets.csv", uploaded_file.getvalue())}
+            )
+            if response.status_code == 200:
+                st.success("Данные успешно загружены!")
+            else:
+                st.error(f"Ошибка загрузки данных: {response.json()['error']}")
+        except Exception as e:
+            st.error(f"Ошибка: {e}")
+
+    if st.button("Посмотреть текущие данные"):
+        try:
+            response = requests.get(f"{API_URL}/data")
+            if response.status_code == 200:
+                data = response.json()["data"]
+                st.write(pd.DataFrame(data))
+            else:
+                st.error(f"Ошибка загрузки данных: {response.json()['error']}")
+        except Exception as e:
+            st.error(f"Ошибка: {e}")
+
+# Вкладка: Визуализация
+elif menu == "Визуализация":
+    st.title("Визуализация данных")
+    try:
+        response = requests.get(f"{API_URL}/data")
         if response.status_code == 200:
-            st.success("Файл успешно загружен!")
+            data = pd.DataFrame(response.json()["data"])
+            st.write("Распределение категорий тикетов:")
+            st.bar_chart(data["Type"].value_counts())
         else:
-            st.error(f"Ошибка загрузки файла: {response.json().get('error', 'Неизвестная ошибка')}")
-    else:
-        st.error("Файл не выбран!")
-
-if st.button("Получить текущие данные"):
-    response = requests.get(f"{API_URL}/data")
-    if response.status_code == 200:
-        data = response.json()["data"]
-        df = pd.DataFrame(data)
-        st.write(df)
-    else:
-        st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
-
-# ====================== Загрузка модели ======================
-st.header("Загрузка пользовательской модели")
-model_file = st.file_uploader("Файл модели (PKL):", type=["pkl"], key="model_upload")
-vectorizer_file = st.file_uploader("Файл векторизатора (PKL):", type=["pkl"], key="vectorizer_upload")
-if st.button("Загрузить модель и векторизатор"):
-    if model_file and vectorizer_file:
-        files = {
-            "model": model_file.getvalue(),
-            "vectorizer": vectorizer_file.getvalue()
-        }
-        response = requests.post(f"{API_URL}/load-model", files=files)
-        if response.status_code == 200:
-            st.success(response.json()["message"])
-        else:
-            st.error(f"Ошибка загрузки модели: {response.json().get('error', 'Неизвестная ошибка')}")
-    else:
-        st.error("Оба файла (модель и векторизатор) должны быть предоставлены!")
-
-# ====================== Экспорт данных ======================
-st.header("Экспорт данных")
-if st.button("Экспортировать данные из базы в tickets.csv"):
-    response = requests.post(f"{API_URL}/export-tickets")
-    if response.status_code == 200:
-        st.success("Данные успешно экспортированы в tickets.csv")
-    else:
-        st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
+            st.error(f"Ошибка загрузки данных: {response.json()['error']}")
+    except Exception as e:
+        st.error(f"Ошибка: {e}")
