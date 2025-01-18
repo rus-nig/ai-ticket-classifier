@@ -8,7 +8,7 @@ API_URL = "http://127.0.0.1:5050"
 st.sidebar.title("Навигация")
 menu = st.sidebar.radio(
     "Выберите действие",
-    ["Статус сервера", "Классификация тикетов", "Обучение модели", "Управление данными", "Визуализация"]
+    ["Статус сервера", "Классификация тикетов", "Обучение модели", "Управление данными", "Визуализация", "Работа с БД"]
 )
 
 # Вкладка: Статус сервера
@@ -103,3 +103,44 @@ elif menu == "Визуализация":
             st.error(f"Ошибка загрузки данных: {response.json()['error']}")
     except Exception as e:
         st.error(f"Ошибка: {e}")
+
+# Работа с БД
+elif menu == "Работа с БД":
+    st.title("Работа с БД")
+    action = st.selectbox("Выберите действие", ["Получить все записи", "Удалить запись", "Редактировать запись"])
+
+    if action == "Получить все записи":
+        if st.button("Получить"):
+            response = requests.get(f"{API_URL}/tickets")
+            if response.status_code == 200:
+                record = response.json().get("tickets", {})
+                st.write(record)
+            else:
+                st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
+
+    elif action == "Удалить запись":
+        record_id = st.text_input("Введите ID записи")
+        if st.button("Удалить"):
+            response = requests.delete(f"{API_URL}/tickets/{record_id}")
+            if response.status_code == 200:
+                st.success("Запись успешно удалена")
+            else:
+                st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
+
+    elif action == "Редактировать запись":
+        record_id = st.text_input("Введите ID записи")
+        new_title = st.text_input("Введите новый заголовок (опционально)")
+        new_description = st.text_area("Введите новое описание (опционально)")
+        new_predicted_type = st.text_input("Введите новую категорию (опционально)")
+
+        if st.button("Редактировать"):
+            payload = {
+                "title": new_title if new_title else None,
+                "description": new_description if new_description else None,
+                "predicted_type": new_predicted_type if new_predicted_type else None,
+            }
+            response = requests.put(f"{API_URL}/tickets/{record_id}", json=payload)
+            if response.status_code == 200:
+                st.success("Запись успешно обновлена")
+            else:
+                st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
