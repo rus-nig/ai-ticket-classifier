@@ -8,7 +8,7 @@ API_URL = "http://127.0.0.1:5050"
 st.sidebar.title("Навигация")
 menu = st.sidebar.radio(
     "Выберите действие",
-    ["Статус сервера", "Классификация тикетов", "Обучение модели", "Управление данными", "Визуализация", "Работа с БД"]
+    ["Статус сервера", "Классификация тикетов", "Обучение модели", "Управление данными", "Визуализация", "Работа с БД", "Работа с моделью"]
 )
 
 # Вкладка: Статус сервера
@@ -144,3 +144,59 @@ elif menu == "Работа с БД":
                 st.success("Запись успешно обновлена")
             else:
                 st.error(f"Ошибка: {response.json().get('error', 'Неизвестная ошибка')}")
+
+# Работа с моделью и векторизатором
+if menu == "Работа с моделью":
+    st.title("Работа с моделью и векторизатором")
+
+    st.subheader("Скачивание файлов")
+    file_type_download = st.selectbox(
+        "Выберите файл для скачивания",
+        ["Модель", "Векторизатор"]
+    )
+
+    if st.button("Скачать выбранный файл"):
+        try:
+            type_param = "model" if file_type_download == "Модель" else "vectorizer"
+            response = requests.get(f"{API_URL}/model-files?type={type_param}", stream=True)
+
+            if response.status_code == 200:
+                st.success(f"Файл {file_type_download.lower()} готов к скачиванию.")
+                file_name = f"downloaded_{type_param}.pkl"
+                with open(file_name, "wb") as file:
+                    file.write(response.content)
+
+                with open(file_name, "rb") as file:
+                    st.download_button(
+                        label=f"Нажмите для скачивания {file_type_download.lower()}",
+                        data=file,
+                        file_name=f"{type_param}.pkl",
+                        mime="application/octet-stream",
+                    )
+            else:
+                st.error(f"Ошибка при скачивании {file_type_download.lower()}: {response.json().get('error', 'Неизвестная ошибка')}")
+        except Exception as e:
+            st.error(f"Ошибка: {e}")
+
+    st.subheader("Загрузка файлов")
+    uploaded_model = st.file_uploader("Загрузите файл модели", type=["pkl"], key="model_uploader")
+    uploaded_vectorizer = st.file_uploader("Загрузите файл векторизатора", type=["pkl"], key="vectorizer_uploader")
+
+    if st.button("Загрузить файлы"):
+        if not uploaded_model or not uploaded_vectorizer:
+            st.error("Оба файла (модель и векторизатор) должны быть предоставлены.")
+        else:
+            try:
+                response = requests.post(
+                    f"{API_URL}/model-files",
+                    files={
+                        "model": ("model.pkl", uploaded_model.getvalue()),
+                        "vectorizer": ("vectorizer.pkl", uploaded_vectorizer.getvalue())
+                    }
+                )
+                if response.status_code == 200:
+                    st.success("Файлы успешно загружены и применены.")
+                else:
+                    st.error(f"Ошибка при загрузке файлов: {response.json().get('error', 'Неизвестная ошибка')}")
+            except Exception as e:
+                st.error(f"Ошибка: {e}")

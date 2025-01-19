@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from src.db.database import get_db_connection
 
 from imblearn.over_sampling import SMOTE
@@ -174,26 +174,48 @@ def manage_data():
         data = pd.read_csv(DATA_PATH, delimiter=';', on_bad_lines='skip').to_dict(orient='records')
         return jsonify({"data": data}), 200
     
-@app.route('/load-model', methods=['POST'])
-def load_model():
-    """Загрузка пользовательской модели и векторизатора."""
-    model_file = request.files.get('model')
-    vectorizer_file = request.files.get('vectorizer')
+@app.route('/model-files', methods=['GET', 'POST'])
+def manage_model_files():
+    """
+    Управление файлами модели и векторизатора.
+    - GET: Скачивание модели и векторизатора.
+    - POST: Загрузка модели и векторизатора.
+    """
+    if request.method == 'POST':
+        # Загрузка модели и векторизатора
+        model_file = request.files.get('model')
+        vectorizer_file = request.files.get('vectorizer')
 
-    if not model_file or not vectorizer_file:
-        return jsonify({"error": "Оба файла (модель и векторизатор) должны быть предоставлены"}), 400
+        if not model_file or not vectorizer_file:
+            return jsonify({"error": "Оба файла (модель и векторизатор) должны быть предоставлены"}), 400
 
-    try:
-        model_file.save(MODEL_PATH)
-        vectorizer_file.save(VECTORIZER_PATH)
+        try:
+            model_file.save(MODEL_PATH)
+            vectorizer_file.save(VECTORIZER_PATH)
 
-        load_model_and_vectorizer()
+            load_model_and_vectorizer()
 
-        return jsonify({"message": "Модель и векторизатор успешно загружены"}), 200
+            return jsonify({"message": "Модель и векторизатор успешно загружены"}), 200
 
-    except Exception as e:
-        return jsonify({"error": f"Ошибка при загрузке модели: {str(e)}"}), 500
-    
+        except Exception as e:
+            return jsonify({"error": f"Ошибка при загрузке файлов: {str(e)}"}), 500
+
+    elif request.method == 'GET':
+        file_type = request.args.get('type')
+        
+        if file_type == 'model':
+            if not os.path.exists(MODEL_PATH):
+                return jsonify({"error": "Файл модели отсутствует"}), 404
+            return send_file(os.path.abspath(MODEL_PATH), as_attachment=True)
+
+        elif file_type == 'vectorizer':
+            if not os.path.exists(VECTORIZER_PATH):
+                return jsonify({"error": "Файл векторизатора отсутствует"}), 404
+            return send_file(os.path.abspath(VECTORIZER_PATH), as_attachment=True)
+
+        else:
+            return jsonify({"error": "Некорректный параметр запроса. Укажите 'type=model' или 'type=vectorizer'."}), 400
+
 @app.route('/train-model', methods=['POST'])
 def train_model():
     """
