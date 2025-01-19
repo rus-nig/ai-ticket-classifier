@@ -4,6 +4,7 @@ matplotlib
 numpy
 pandas
 psycopg2-binary
+pytest
 requests
 scikit-learn
 seaborn
