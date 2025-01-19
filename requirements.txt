@@ -3,6 +3,7 @@ imblearn
 matplotlib
 numpy
 pandas
+playwright
 psycopg2-binary
 pytest
 requests
