@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file
+from flasgger import Swagger
 from src.db.database import get_db_connection
 
 from imblearn.over_sampling import SMOTE
@@ -17,6 +18,25 @@ import pandas as pd
 import shutil
 
 app = Flask(__name__)
+
+swagger_config = {
+    "openapi": "3.0.0",
+    "headers": {},
+    "specs": [
+        {
+            "endpoint": "apispec",
+            "route": "/apispec.json",
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs/",
+    "version": "1.0.0",
+}
+
+swagger = Swagger(app, config=swagger_config)
 
 # Пути к файлам
 DATA_PATH = 'data/tickets.csv'
@@ -91,14 +111,83 @@ load_model_and_vectorizer()
 
 @app.route('/status', methods=['GET'])
 def status():
-    """Проверка работы API."""
+    """
+    Проверка работы API
+    ---
+    tags:
+      - Health Check
+    responses:
+      200:
+        description: API работает
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: "API работает"
+    """
     return jsonify({
         "status": "API работает"
     })
 
 @app.route('/categorize', methods=['POST'])
 def categorize():
-    """Категоризация тикета и сохранение результата в БД."""
+    """
+    Категоризация тикета
+    ---
+    tags:
+      - Ticket Categorization
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              description:
+                type: string
+                example: "Текст тикета"
+              id:
+                type: string
+                example: "12345"
+              title:
+                type: string
+                example: "Название тикета"
+    responses:
+      200:
+        description: Успешное предсказание
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+                  example: "Текст тикета"
+                predicted_type:
+                  type: string
+                  example: "Bug"
+                ticket_id:
+                  type: string
+                  example: "12345"
+                title:
+                  type: string
+                  example: "Название тикета"
+      400:
+        description: Ошибка в запросе
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Отсутствует описание тикета"
+      500:
+        description: Ошибка на сервере
+    """
     if model is None or vectorizer is None:
         return jsonify({"error": "Модель не загружена"}), 500
 
@@ -138,13 +227,83 @@ def categorize():
 
 @app.route('/data', methods=['POST', 'GET'])
 def manage_data():
-    """Управление данными (загрузка/сохранение)."""
+    """
+    Управление данными
+    ---
+    tags:
+      - Data Management
+    post:
+      summary: Загрузка данных
+      description: Загружает CSV-файл с данными.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV-файл с данными тикетов.
+      responses:
+        200:
+          description: Файл успешно загружен.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Файл успешно загружен"
+        400:
+          description: Ошибка при загрузке файла.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Файл должен быть в формате CSV"
+    get:
+      summary: Получение данных
+      description: Возвращает данные из файла tickets.csv.
+      responses:
+        200:
+          description: Данные успешно получены.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Description:
+                          type: string
+                          example: "Описание тикета"
+                        Type:
+                          type: string
+                          example: "Bug"
+        404:
+          description: Файл данных отсутствует.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Файл данных отсутствует"
+    """
     if request.method == 'POST':
         file = request.files.get('file')
-        
         if not file:
             return jsonify({"error": "Файл не предоставлен"}), 400
-        
         if not file.filename.endswith('.csv'):
             return jsonify({"error": "Файл должен быть в формате CSV"}), 400
 
@@ -153,16 +312,9 @@ def manage_data():
 
         try:
             data = pd.read_csv(temp_path, delimiter=';', usecols=['Description', 'Type'])
-            required_columns = ['Description', 'Type']
-            for col in required_columns:
-                if col not in data.columns:
-                    os.remove(temp_path)
-                    return jsonify({"error": f"Отсутствует колонка '{col}' в CSV"}), 400
-
             shutil.copy(temp_path, DATA_PATH)
             os.remove(temp_path)
             return jsonify({"message": "Файл успешно загружен"}), 200
-
         except Exception as e:
             os.remove(temp_path)
             return jsonify({"error": f"Ошибка при обработке файла: {str(e)}"}), 400
@@ -170,56 +322,182 @@ def manage_data():
     if request.method == 'GET':
         if not os.path.exists(DATA_PATH):
             return jsonify({"error": "Файл данных отсутствует"}), 404
-
         data = pd.read_csv(DATA_PATH, delimiter=';', on_bad_lines='skip').to_dict(orient='records')
         return jsonify({"data": data}), 200
-    
+
 @app.route('/model-files', methods=['GET', 'POST'])
 def manage_model_files():
     """
-    Управление файлами модели и векторизатора.
-    - GET: Скачивание модели и векторизатора.
-    - POST: Загрузка модели и векторизатора.
+    Управление файлами модели и векторизатора
+    ---
+    tags:
+      - Model Management
+    post:
+      summary: Загрузка модели и векторизатора
+      description: Загружает пользовательскую модель и векторизатор.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  format: binary
+                  description: Файл модели.
+                vectorizer:
+                  type: string
+                  format: binary
+                  description: Файл векторизатора.
+      responses:
+        200:
+          description: Файлы успешно загружены.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Модель и векторизатор успешно загружены"
+        400:
+          description: Ошибка загрузки файлов.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Оба файла (модель и векторизатор) должны быть предоставлены"
+    get:
+      summary: Скачивание модели или векторизатора
+      description: Возвращает файл модели или векторизатора.
+      parameters:
+        - in: query
+          name: type
+          required: true
+          description: Тип запрашиваемого файла.
+          schema:
+            type: string
+            enum:
+              - model
+              - vectorizer
+      responses:
+        200:
+          description: Файл успешно скачан.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: Файл не найден.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Файл модели отсутствует"
+        400:
+          description: Некорректный параметр запроса.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Некорректный параметр запроса. Укажите 'type=model' или 'type=vectorizer'."
     """
     if request.method == 'POST':
-        # Загрузка модели и векторизатора
         model_file = request.files.get('model')
         vectorizer_file = request.files.get('vectorizer')
-
         if not model_file or not vectorizer_file:
             return jsonify({"error": "Оба файла (модель и векторизатор) должны быть предоставлены"}), 400
 
         try:
             model_file.save(MODEL_PATH)
             vectorizer_file.save(VECTORIZER_PATH)
-
             load_model_and_vectorizer()
-
             return jsonify({"message": "Модель и векторизатор успешно загружены"}), 200
-
         except Exception as e:
             return jsonify({"error": f"Ошибка при загрузке файлов: {str(e)}"}), 500
 
     elif request.method == 'GET':
         file_type = request.args.get('type')
-        
         if file_type == 'model':
             if not os.path.exists(MODEL_PATH):
                 return jsonify({"error": "Файл модели отсутствует"}), 404
             return send_file(os.path.abspath(MODEL_PATH), as_attachment=True)
-
         elif file_type == 'vectorizer':
             if not os.path.exists(VECTORIZER_PATH):
                 return jsonify({"error": "Файл векторизатора отсутствует"}), 404
             return send_file(os.path.abspath(VECTORIZER_PATH), as_attachment=True)
-
         else:
             return jsonify({"error": "Некорректный параметр запроса. Укажите 'type=model' или 'type=vectorizer'."}), 400
 
 @app.route('/train-model', methods=['POST'])
 def train_model():
     """
-    Обучение модели на основе данных из tickets.csv с опциональной догрузкой данных из БД.
+    Обучение модели
+    ---
+    tags:
+      - Model Training
+    post:
+      summary: Обучение модели
+      description: Обучает модель на основе данных в `tickets.csv` с возможностью догрузки данных из базы.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                load_from_db:
+                  type: boolean
+                  description: Загрузить дополнительные данные из базы перед обучением.
+                  example: true
+      responses:
+        200:
+          description: Модель успешно обучена.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Обучение завершено. Лучшая модель: Random Forest с точностью 0.9452"
+                  model_path:
+                    type: string
+                    example: "models/ticket_classifier.pkl"
+                  vectorizer_path:
+                    type: string
+                    example: "models/tfidf_vectorizer.pkl"
+        404:
+          description: Файл данных отсутствует.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Файл tickets.csv не найден"
+        500:
+          description: Ошибка обучения модели.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Ошибка обучения модели: <описание ошибки>"
     """
     # Проверяем, передал ли пользователь параметр для догрузки данных из БД
     data = request.get_json()
@@ -317,7 +595,48 @@ def train_model():
 @app.route('/tickets', methods=['GET'])
 def get_tickets():
     """
-    Получение всех записей из базы данных.
+    Получение всех записей
+    ---
+    tags:
+      - Tickets
+    get:
+      summary: Получение всех записей тикетов
+      description: Возвращает все записи тикетов из базы данных.
+      responses:
+        200:
+          description: Записи успешно получены.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tickets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        title:
+                          type: string
+                          example: "Ошибка загрузки отчета"
+                        description:
+                          type: string
+                          example: "Не удается загрузить отчет при выборе определенных фильтров"
+                        predicted_type:
+                          type: string
+                          example: "Bug"
+        500:
+          description: Ошибка при получении данных из базы.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Ошибка при получении данных из базы"
     """
     try:
         conn = get_db_connection()
@@ -342,7 +661,52 @@ def get_tickets():
 @app.route('/tickets/<id>', methods=['DELETE'])
 def delete_ticket(id):
     """
-    Удаление записи из базы данных по id.
+    Удаление записи
+    ---
+    tags:
+      - Tickets
+    delete:
+      summary: Удаление тикета
+      description: Удаляет запись тикета из базы данных по указанному ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Уникальный идентификатор тикета
+          example: "123"
+      responses:
+        200:
+          description: Запись успешно удалена.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Тикет с ID 123 успешно удален"
+        404:
+          description: Запись не найдена.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Тикет с ID 123 не найден"
+        500:
+          description: Ошибка при удалении записи.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Ошибка при удалении записи из базы"
     """
     try:
         conn = get_db_connection()
@@ -366,7 +730,81 @@ def delete_ticket(id):
 @app.route('/tickets/<id>', methods=['PUT'])
 def update_ticket(id):
     """
-    Обновление записи в базе данных.
+    Обновление записи
+    ---
+    tags:
+      - Tickets
+    put:
+      summary: Обновление тикета
+      description: Обновляет поля существующей записи тикета в базе данных.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Уникальный идентификатор тикета
+          example: "123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Новый заголовок тикета
+                  example: "Обновленный заголовок"
+                description:
+                  type: string
+                  description: Новое описание тикета
+                  example: "Обновленное описание тикета"
+                predicted_type:
+                  type: string
+                  description: Новая категория тикета
+                  example: "Task"
+      responses:
+        200:
+          description: Запись успешно обновлена.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Тикет с ID 123 успешно обновлен"
+        404:
+          description: Запись не найдена.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Тикет с ID 123 не найден"
+        400:
+          description: Отсутствуют данные для обновления.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Нет данных для обновления"
+        500:
+          description: Ошибка при обновлении записи.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Ошибка при обновлении записи в базе"
     """
     try:
         data = request.get_json()

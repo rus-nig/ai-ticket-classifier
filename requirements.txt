@@ -1,3 +1,4 @@
+flasgger
 flask
 imblearn
 matplotlib
