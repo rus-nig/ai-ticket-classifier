@@ -1,21 +1,20 @@
-from flask import Flask, request, jsonify, send_file
-from flasgger import Swagger
-from src.db.database import get_db_connection
+import csv
+import os
+import pickle
+import shutil
 
+import pandas as pd
+from flask import Flask, jsonify, request, send_file
+from flasgger import Swagger
 from imblearn.over_sampling import SMOTE
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-
-import pickle
-import csv
-import os
-import pandas as pd
-import shutil
+from src.db.database import get_db_connection
 
 app = Flask(__name__)
 
