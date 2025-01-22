@@ -93,12 +93,55 @@ elif menu == "Управление данными":
 # Вкладка: Визуализация
 elif menu == "Визуализация":
     st.title("Визуализация данных")
+    
     try:
         response = requests.get(f"{API_URL}/data")
         if response.status_code == 200:
             data = pd.DataFrame(response.json()["data"])
-            st.write("Распределение категорий тикетов:")
-            st.bar_chart(data["Type"].value_counts())
+            
+            if data.empty:
+                st.warning("Данные отсутствуют для визуализации.")
+            else:
+                st.write("Выберите тип визуализации данных:")
+                visualization_type = st.selectbox(
+                    "Тип визуализации",
+                    ["Распределение категорий", "Частотный анализ слов", "Динамика по времени"]
+                )
+                
+                if visualization_type == "Распределение категорий":
+                    st.subheader("Распределение категорий тикетов")
+                    st.bar_chart(data["Type"].value_counts())
+
+                elif visualization_type == "Частотный анализ слов":
+                    st.subheader("Частотный анализ слов в описаниях тикетов")
+                    all_descriptions = " ".join(data["Description"].dropna().tolist())
+                    word_counts = pd.Series(all_descriptions.split()).value_counts().head(20)
+                    
+                    st.write("Топ-20 самых частых слов:")
+                    st.bar_chart(word_counts)
+
+                elif visualization_type == "Динамика по времени":
+                    st.subheader("Динамика создания тикетов по времени")
+                    
+                    if "Created_At" not in data.columns:
+                        st.warning("Временная информация отсутствует. Генерируются случайные даты.")
+                        import random
+                        data["Created_At"] = pd.date_range("2025-01-01", periods=len(data), freq="D")
+                    
+                    data["Created_At"] = pd.to_datetime(data["Created_At"])
+                    tickets_by_date = data.groupby(data["Created_At"].dt.date).size()
+                    
+                    st.line_chart(tickets_by_date)
+                    
+                st.subheader("Фильтрация данных")
+                category_filter = st.multiselect("Фильтруйте по категориям:", data["Type"].unique())
+                
+                if category_filter:
+                    filtered_data = data[data["Type"].isin(category_filter)]
+                    st.write("Отфильтрованные данные:")
+                    st.dataframe(filtered_data)
+                else:
+                    st.info("Выберите категории для фильтрации данных.")
         else:
             st.error(f"Ошибка загрузки данных: {response.json()['error']}")
     except Exception as e:
