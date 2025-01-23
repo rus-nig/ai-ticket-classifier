@@ -598,44 +598,43 @@ def get_tickets():
     ---
     tags:
       - Tickets
-    get:
-      summary: Получение всех записей тикетов
-      description: Возвращает все записи тикетов из базы данных.
-      responses:
-        200:
-          description: Записи успешно получены.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  tickets:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        title:
-                          type: string
-                          example: "Ошибка загрузки отчета"
-                        description:
-                          type: string
-                          example: "Не удается загрузить отчет при выборе определенных фильтров"
-                        predicted_type:
-                          type: string
-                          example: "Bug"
-        500:
-          description: Ошибка при получении данных из базы.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Ошибка при получении данных из базы"
+    summary: Получение всех записей тикетов
+    description: Возвращает все записи тикетов из базы данных.
+    responses:
+      200:
+        description: Записи успешно получены.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tickets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      title:
+                        type: string
+                        example: "Ошибка загрузки отчета"
+                      description:
+                        type: string
+                        example: "Не удается загрузить отчет при выборе определенных фильтров"
+                      predicted_type:
+                        type: string
+                        example: "Bug"
+      500:
+        description: Ошибка при получении данных из базы.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Ошибка при получении данных из базы"
     """
     try:
         conn = get_db_connection()
@@ -656,7 +655,6 @@ def get_tickets():
         print("Ошибка при получении данных из БД:", e)
         return jsonify({"error": "Ошибка при получении данных из базы"}), 500
 
-
 @app.route('/tickets/<id>', methods=['DELETE'])
 def delete_ticket(id):
     """
@@ -664,48 +662,47 @@ def delete_ticket(id):
     ---
     tags:
       - Tickets
-    delete:
-      summary: Удаление тикета
-      description: Удаляет запись тикета из базы данных по указанному ID.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Уникальный идентификатор тикета
-          example: "123"
-      responses:
-        200:
-          description: Запись успешно удалена.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Тикет с ID 123 успешно удален"
-        404:
-          description: Запись не найдена.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Тикет с ID 123 не найден"
-        500:
-          description: Ошибка при удалении записи.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Ошибка при удалении записи из базы"
+    summary: Удаление тикета
+    description: Удаляет запись тикета из базы данных по указанному ID.
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Уникальный идентификатор тикета
+        example: "123"
+    responses:
+      200:
+        description: Запись успешно удалена.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "Тикет с ID 123 успешно удален"
+      404:
+        description: Запись не найдена.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "Тикет с ID 123 не найден"
+      500:
+        description: Ошибка при удалении записи.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Ошибка при удалении записи из базы"
     """
     try:
         conn = get_db_connection()
@@ -725,7 +722,6 @@ def delete_ticket(id):
         print("Ошибка при удалении записи из БД:", e)
         return jsonify({"error": "Ошибка при удалении записи из базы"}), 500
 
-
 @app.route('/tickets/<id>', methods=['PUT'])
 def update_ticket(id):
     """
@@ -733,77 +729,76 @@ def update_ticket(id):
     ---
     tags:
       - Tickets
-    put:
-      summary: Обновление тикета
-      description: Обновляет поля существующей записи тикета в базе данных.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Уникальный идентификатор тикета
-          example: "123"
-      requestBody:
+    summary: Обновление тикета
+    description: Обновляет поля существующей записи тикета в базе данных.
+    parameters:
+      - name: id
+        in: path
         required: true
+        schema:
+          type: string
+        description: Уникальный идентификатор тикета
+        example: "123"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              title:
+                type: string
+                description: Новый заголовок тикета
+                example: "Обновленный заголовок"
+              description:
+                type: string
+                description: Новое описание тикета
+                example: "Обновленное описание тикета"
+              predicted_type:
+                type: string
+                description: Новая категория тикета
+                example: "Task"
+    responses:
+      200:
+        description: Запись успешно обновлена.
         content:
           application/json:
             schema:
               type: object
               properties:
-                title:
+                message:
                   type: string
-                  description: Новый заголовок тикета
-                  example: "Обновленный заголовок"
-                description:
+                  example: "Тикет с ID 123 успешно обновлен"
+      404:
+        description: Запись не найдена.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
                   type: string
-                  description: Новое описание тикета
-                  example: "Обновленное описание тикета"
-                predicted_type:
+                  example: "Тикет с ID 123 не найден"
+      400:
+        description: Отсутствуют данные для обновления.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
                   type: string
-                  description: Новая категория тикета
-                  example: "Task"
-      responses:
-        200:
-          description: Запись успешно обновлена.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Тикет с ID 123 успешно обновлен"
-        404:
-          description: Запись не найдена.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Тикет с ID 123 не найден"
-        400:
-          description: Отсутствуют данные для обновления.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Нет данных для обновления"
-        500:
-          description: Ошибка при обновлении записи.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Ошибка при обновлении записи в базе"
+                  example: "Нет данных для обновления"
+      500:
+        description: Ошибка при обновлении записи.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Ошибка при обновлении записи в базе"
     """
     try:
         data = request.get_json()
