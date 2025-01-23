@@ -8,7 +8,7 @@ API_URL = "http://127.0.0.1:5050"
 st.sidebar.title("Навигация")
 menu = st.sidebar.radio(
     "Выберите действие",
-    ["Статус сервера", "Классификация тикетов", "Обучение модели", "Управление данными", "Визуализация", "Работа с БД", "Работа с моделью", "Swagger UI"]
+    ["Статус сервера", "Классификация тикетов", "Обучение модели", "Управление данными", "Визуализация", "Работа с БД", "Работа с моделью"]
 )
 
 # Вкладка: Статус сервера
@@ -244,11 +244,23 @@ elif menu == "Работа с моделью":
             except Exception as e:
                 st.error(f"Ошибка: {e}")
 
-elif menu == "Swagger UI":
-    st.title("Документация API (Swagger UI)")
-    st.markdown(
-        """
-        [Открыть Swagger UI](http://127.0.0.1:5050/apidocs/)
-        """,
-        unsafe_allow_html=True
-    )
+st.sidebar.markdown(
+    """
+    <hr>
+    <div style="text-align: center;">
+        <a href="http://127.0.0.1:5050/apidocs/" target="_blank" style="text-decoration: none;">
+            <button style="
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 15px;
+                font-size: 14px;
+                cursor: pointer;
+                border-radius: 5px;">
+                Swagger UI
+            </button>
+        </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
