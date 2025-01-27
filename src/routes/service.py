@@ -231,73 +231,50 @@ def manage_data():
     ---
     tags:
       - Data Management
-    post:
-      summary: Загрузка данных
-      description: Загружает CSV-файл с данными.
-      requestBody:
-        required: true
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+                description: CSV-файл с данными тикетов
+    responses:
+      200:
+        description: Успешный ответ
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               properties:
-                file:
+                message:
                   type: string
-                  format: binary
-                  description: CSV-файл с данными тикетов.
-      responses:
-        200:
-          description: Файл успешно загружен.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Файл успешно загружен"
-        400:
-          description: Ошибка при загрузке файла.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Файл должен быть в формате CSV"
-    get:
-      summary: Получение данных
-      description: Возвращает данные из файла tickets.csv.
-      responses:
-        200:
-          description: Данные успешно получены.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        Description:
-                          type: string
-                          example: "Описание тикета"
-                        Type:
-                          type: string
-                          example: "Bug"
-        404:
-          description: Файл данных отсутствует.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Файл данных отсутствует"
+                  example: "Файл успешно загружен"
+      400:
+        description: Ошибка запроса
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Ошибка при загрузке файла"
+      404:
+        description: Файл данных отсутствует
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Файл данных отсутствует"
     """
     if request.method == 'POST':
         file = request.files.get('file')
@@ -331,86 +308,78 @@ def manage_model_files():
     ---
     tags:
       - Model Management
-    post:
-      summary: Загрузка модели и векторизатора
-      description: Загружает пользовательскую модель и векторизатор.
-      requestBody:
-        required: true
+    summary: Управление файлами модели и векторизатора
+    description: Позволяет загружать и скачивать файлы модели и векторизатора.
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              model:
+                type: string
+                format: binary
+                description: Файл модели.
+              vectorizer:
+                type: string
+                format: binary
+                description: Файл векторизатора.
+    parameters:
+      - in: query
+        name: type
+        required: false
+        description: Тип запрашиваемого файла.
+        schema:
+          type: string
+          enum:
+            - model
+            - vectorizer
+    responses:
+      200:
+        description: Запрос выполнен успешно.
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               properties:
-                model:
+                message:
                   type: string
-                  format: binary
-                  description: Файл модели.
-                vectorizer:
-                  type: string
-                  format: binary
-                  description: Файл векторизатора.
-      responses:
-        200:
-          description: Файлы успешно загружены.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Модель и векторизатор успешно загружены"
-        400:
-          description: Ошибка загрузки файлов.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Оба файла (модель и векторизатор) должны быть предоставлены"
-    get:
-      summary: Скачивание модели или векторизатора
-      description: Возвращает файл модели или векторизатора.
-      parameters:
-        - in: query
-          name: type
-          required: true
-          description: Тип запрашиваемого файла.
+                  example: "Модель и векторизатор успешно загружены"
+        application/octet-stream:
           schema:
             type: string
-            enum:
-              - model
-              - vectorizer
-      responses:
-        200:
-          description: Файл успешно скачан.
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        404:
-          description: Файл не найден.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Файл модели отсутствует"
-        400:
-          description: Некорректный параметр запроса.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Некорректный параметр запроса. Укажите 'type=model' или 'type=vectorizer'."
+            format: binary
+      400:
+        description: Ошибка в запросе.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Некорректный параметр запроса. Укажите 'type=model' или 'type=vectorizer'."
+      404:
+        description: Файл не найден.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Файл модели отсутствует"
+      500:
+        description: Ошибка сервера.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Ошибка при загрузке файлов: <описание ошибки>"
     """
     if request.method == 'POST':
         model_file = request.files.get('model')
@@ -446,57 +415,54 @@ def train_model():
     ---
     tags:
       - Model Training
-    post:
-      summary: Обучение модели
-      description: Обучает модель на основе данных в `tickets.csv` с возможностью догрузки данных из базы.
-      requestBody:
-        required: true
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              load_from_db:
+                type: boolean
+                description: Загрузить дополнительные данные из базы перед обучением.
+                example: true
+    responses:
+      200:
+        description: Модель успешно обучена.
         content:
           application/json:
             schema:
               type: object
               properties:
-                load_from_db:
-                  type: boolean
-                  description: Загрузить дополнительные данные из базы перед обучением.
-                  example: true
-      responses:
-        200:
-          description: Модель успешно обучена.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Обучение завершено. Лучшая модель: Random Forest с точностью 0.9452"
-                  model_path:
-                    type: string
-                    example: "models/ticket_classifier.pkl"
-                  vectorizer_path:
-                    type: string
-                    example: "models/tfidf_vectorizer.pkl"
-        404:
-          description: Файл данных отсутствует.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Файл tickets.csv не найден"
-        500:
-          description: Ошибка обучения модели.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Ошибка обучения модели: <описание ошибки>"
+                message:
+                  type: string
+                  example: "Обучение завершено. Лучшая модель: Random Forest с точностью 0.9452"
+                model_path:
+                  type: string
+                  example: "models/ticket_classifier.pkl"
+                vectorizer_path:
+                  type: string
+                  example: "models/tfidf_vectorizer.pkl"
+      404:
+        description: Файл данных отсутствует.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Файл tickets.csv не найден"
+      500:
+        description: Ошибка обучения модели.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Ошибка обучения модели: <описание ошибки>"
     """
     # Проверяем, передал ли пользователь параметр для догрузки данных из БД
     data = request.get_json()
